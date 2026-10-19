@@ -75,6 +75,54 @@ def load_dotenv(path: str | Path | None = None, override: bool = False) -> dict[
     return applied
 
 
+# PythonAnywhere free accounts have no direct route to the internet. Outbound
+# HTTP has to go through their proxy, and anything that tries to connect
+# straight out fails with "[Errno 101] Network is unreachable".
+#
+# Consoles get the proxy variables set for them; web app processes do not, so
+# sign-in works right up until the server tries to swap the code for a token.
+PYTHONANYWHERE_PROXY = "http://proxy.server:3128"
+
+
+def on_pythonanywhere() -> bool:
+    return bool(
+        os.environ.get("PYTHONANYWHERE_DOMAIN")
+        or os.environ.get("PYTHONANYWHERE_SITE")
+        or Path("/var/www").is_dir() and Path("/home").joinpath(
+            os.environ.get("USER", "")
+        ).joinpath(".pythonanywhere").exists()
+    )
+
+
+def configure_proxy() -> str | None:
+    """Point outbound HTTP at a proxy when the host requires one.
+
+    `requests` reads these variables directly, and httplib2 -- which
+    google-api-python-client uses -- defaults to
+    `proxy_info_from_environment`, so setting them covers both the OAuth
+    token exchange and every Gmail, Sheets and Drive call afterwards.
+
+    An explicit APPLITRACK_PROXY always wins; otherwise PythonAnywhere is
+    detected and its proxy used. Returns whatever was applied.
+    """
+    proxy = os.environ.get("APPLITRACK_PROXY", "").strip()
+
+    if not proxy and on_pythonanywhere():
+        proxy = PYTHONANYWHERE_PROXY
+
+    if not proxy:
+        return None
+
+    # Never override a proxy the host already configured.
+    for var in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        os.environ.setdefault(var, proxy)
+
+    # Keep loopback direct, or health checks would go out and come back.
+    os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
+    os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1")
+    return proxy
+
+
 def write_dotenv(values: dict[str, str], path: str | Path | None = None) -> Path:
     """Create or update `.env`, keeping any keys already in it.
 

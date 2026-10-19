@@ -28,7 +28,7 @@ from flask import (
     Flask, abort, flash, redirect, render_template, request, session, url_for
 )
 
-from ..env import load_dotenv
+from ..env import configure_proxy, load_dotenv
 from ..pipeline import summarise
 from ..store import Store
 from . import oauth, push
@@ -39,6 +39,8 @@ from .users import UserStore
 
 # Before anything reads os.environ. A real shell variable still wins.
 load_dotenv()
+# Some hosts (PythonAnywhere free) have no direct outbound route.
+_PROXY = configure_proxy()
 
 log = logging.getLogger("applitrack.web")
 
@@ -316,6 +318,7 @@ def _register_routes(app: Flask, user_store: UserStore):
     def healthz():
         return {
             "ok": True,
+            "proxy": bool(_PROXY),
             "users": user_store.count(),
             "realtime": push.push_configured(),
             "email": mailer_configured(),

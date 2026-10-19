@@ -16,9 +16,10 @@ import sys
 
 
 def main(argv=None) -> int:
-    from ..env import load_dotenv
+    from ..env import configure_proxy, load_dotenv
 
     load_dotenv()          # a real shell variable still wins
+    configure_proxy()
 
     parser = argparse.ArgumentParser(prog="applitrack-service")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -112,6 +113,13 @@ def cmd_check() -> int:
         rows.append(("  webhook token", bool(push.PUSH_TOKEN),
                      "set" if push.PUSH_TOKEN
                      else "missing - /push accepts anonymous posts"))
+
+    from ..env import on_pythonanywhere
+    proxy = os.environ.get("https_proxy") or os.environ.get("HTTPS_PROXY")
+    if on_pythonanywhere() or proxy:
+        rows.append(("Outbound proxy", bool(proxy),
+                     proxy or "PythonAnywhere detected but no proxy set - "
+                              "outbound calls will fail"))
 
     try:
         import flask  # noqa: F401

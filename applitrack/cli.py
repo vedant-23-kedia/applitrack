@@ -22,9 +22,10 @@ from .models import Status
 
 
 def main(argv: list[str] | None = None) -> int:
-    from .env import load_dotenv
+    from .env import configure_proxy, load_dotenv
 
     load_dotenv()
+    configure_proxy()
 
     parser = argparse.ArgumentParser(
         prog="applitrack",

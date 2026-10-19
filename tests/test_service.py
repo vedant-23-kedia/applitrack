@@ -662,6 +662,68 @@ def test_sync_result_knows_when_it_is_incomplete():
     failed = SyncResult(ok=False, error="boom", remaining=0)
     assert failed.complete is False
 
+
+# --------------------------------------------------------------------------
+# Outbound proxy (PythonAnywhere free tier)
+# --------------------------------------------------------------------------
+
+def _clear_proxy_env():
+    for v in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY",
+              "no_proxy", "NO_PROXY", "APPLITRACK_PROXY",
+              "PYTHONANYWHERE_DOMAIN", "PYTHONANYWHERE_SITE"):
+        os.environ.pop(v, None)
+
+
+def test_pythonanywhere_is_detected_and_proxied():
+    """Regression: without this the token exchange dies with
+    '[Errno 101] Network is unreachable' after a successful Google sign-in."""
+    from applitrack.env import PYTHONANYWHERE_PROXY, configure_proxy
+
+    _clear_proxy_env()
+    os.environ["PYTHONANYWHERE_DOMAIN"] = "pythonanywhere.com"
+    try:
+        applied = configure_proxy()
+        assert applied == PYTHONANYWHERE_PROXY
+        assert os.environ["https_proxy"] == PYTHONANYWHERE_PROXY
+        assert os.environ["HTTPS_PROXY"] == PYTHONANYWHERE_PROXY
+        # Loopback must stay direct or health checks round-trip the proxy.
+        assert "127.0.0.1" in os.environ["no_proxy"]
+    finally:
+        _clear_proxy_env()
+
+
+def test_no_proxy_is_set_on_an_ordinary_machine():
+    from applitrack.env import configure_proxy
+
+    _clear_proxy_env()
+    try:
+        assert configure_proxy() is None
+        assert "https_proxy" not in os.environ
+    finally:
+        _clear_proxy_env()
+
+
+def test_explicit_proxy_wins_and_host_proxy_is_never_overridden():
+    from applitrack.env import configure_proxy
+
+    _clear_proxy_env()
+    os.environ["PYTHONANYWHERE_DOMAIN"] = "pythonanywhere.com"
+    os.environ["APPLITRACK_PROXY"] = "http://my.proxy:8080"
+    try:
+        assert configure_proxy() == "http://my.proxy:8080"
+    finally:
+        _clear_proxy_env()
+
+    # A proxy the host already set must survive untouched.
+    _clear_proxy_env()
+    os.environ["PYTHONANYWHERE_DOMAIN"] = "pythonanywhere.com"
+    os.environ["https_proxy"] = "http://host.set:3128"
+    try:
+        configure_proxy()
+        assert os.environ["https_proxy"] == "http://host.set:3128"
+    finally:
+        _clear_proxy_env()
+
 # --------------------------------------------------------------------------
 
 def run() -> int:
