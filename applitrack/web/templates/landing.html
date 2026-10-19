@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}AppliTrack - your job applications, tracked automatically{% endblock %}
+
+{% block nav %}
+<a class="btn sm" href="{{ url_for('login') }}">Connect Gmail</a>
+{% endblock %}
+
+{% block style %}
+.hero{padding:56px 0 20px;max-width:680px}
+.lead{font-size:18px;color:var(--muted);margin-bottom:26px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+.steps li{counter-increment:s;position:relative;padding-left:40px;margin-bottom:16px}
+.steps li::before{
+  content:counter(s);position:absolute;left:0;top:1px;width:26px;height:26px;
+  border-radius:50%;background:var(--accent);color:var(--accent-fg);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.two{grid-template-columns:1fr}.hero{padding:34px 0 10px}}
+.demo{font-size:13px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.demo .row{display:flex;justify-content:space-between;gap:10px;
+  padding:9px 13px;border-bottom:1px solid var(--line)}
+.demo .row:last-child{border-bottom:0}
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <h1>Your job applications, tracked without opening your inbox.</h1>
+  <p class="lead">
+    Connect your Gmail. AppliTrack finds every job you have applied to, works out
+    whether each one is live, rejected or waiting on you, and keeps a spreadsheet
+    in your own Google Drive up to date{% if realtime %} the moment a company
+    replies{% else %} automatically{% endif %}.
+  </p>
+  <p>
+    <a class="btn" href="{{ url_for('login') }}">Connect your Gmail</a>
+    &nbsp;<span class="small muted">Free. Read-only. Disconnect anytime.</span>
+  </p>
+</div>
+
+<h2>What you get</h2>
+<div class="two">
+  <div class="card">
+    <strong>A spreadsheet you own</strong>
+    <p class="small muted" style="margin:8px 0 0">
+      Created in your own Google Drive, with company, role, status, how long each
+      one has been quiet, and a link straight to the email thread. Your own notes
+      column is never overwritten.
+    </p>
+  </div>
+  <div class="card">
+    <strong>An email when something changes</strong>
+    <p class="small muted" style="margin:8px 0 0">
+      Rejected, moved to interview, sent an assessment &mdash; you hear about it
+      without reading a single recruiter email.
+    </p>
+  </div>
+</div>
+
+<h2>How it works</h2>
+<ol class="steps">
+  <li><strong>You connect Gmail.</strong> Google asks your permission; we never see your password.</li>
+  <li><strong>We read the last year of mail.</strong> Read-only &mdash; nothing can be sent, changed or deleted.</li>
+  <li><strong>The noise gets thrown away.</strong> Job boards send marketing that copies the
+      wording of real emails &mdash; "Confirm your application", "Application update". Those are
+      filtered out; real updates are kept.</li>
+  <li><strong>Your sheet appears,</strong> and the link arrives in your inbox.</li>
+  <li><strong>It stays current by itself</strong>{% if realtime %} &mdash; within seconds of a
+      company emailing you{% endif %}.</li>
+</ol>
+
+<h2>What it looks like</h2>
+<div class="demo">
+  <div class="row"><span><strong>Northwind Systems</strong> &middot; Online assessment</span>
+    <span class="pill Assessment">Assessment</span></div>
+  <div class="row"><span><strong>Initech</strong> &middot; Graduate Programme 2027</span>
+    <span class="pill Acknowledged">Acknowledged</span></div>
+  <div class="row"><span><strong>Globex Corp</strong> &middot; Software Engineer, VP</span>
+    <span class="pill Rejected">Rejected</span></div>
+  <div class="row"><span><strong>Umbrella Labs</strong> &middot; Modelling Analyst
+    <span class="muted small">&mdash; silent 103 days</span></span>
+    <span class="pill Ghosted">Ghosted</span></div>
+</div>
+
+<h2>What we ask for, and what we do not</h2>
+<div class="two">
+  <div class="card">
+    <strong>We ask for</strong>
+    <ul class="small muted" style="margin:8px 0 0;padding-left:18px;line-height:1.8">
+      <li>Read-only Gmail</li>
+      <li>Permission to create <em>one</em> spreadsheet in your Drive</li>
+      <li>Your email address, to know who you are</li>
+    </ul>
+  </div>
+  <div class="card">
+    <strong>We cannot</strong>
+    <ul class="small muted" style="margin:8px 0 0;padding-left:18px;line-height:1.8">
+      <li>Send, delete or edit any email</li>
+      <li>See any other file in your Drive</li>
+      <li>Share your data with anyone</li>
+    </ul>
+  </div>
+</div>
+
+<p style="margin:30px 0 10px">
+  <a class="btn" href="{{ url_for('login') }}">Connect your Gmail</a>
+</p>
+{% if user_count %}
+<p class="small muted">{{ user_count }} {{ "person" if user_count == 1 else "people" }} tracking their applications here.</p>
+{% endif %}
+{% endblock %}

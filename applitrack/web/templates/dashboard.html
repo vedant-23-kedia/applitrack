@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Your applications - AppliTrack{% endblock %}
+
+{% block nav %}
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <span class="small muted hide-sm">{{ user.email }}</span>
+  {% if user.sheet_url %}
+    <a class="btn sm" href="{{ user.sheet_url }}" target="_blank" rel="noopener">Open sheet</a>
+  {% endif %}
+  <form method="post" action="{{ url_for('refresh') }}" style="display:inline">
+    <button class="btn sm ghost" type="submit">Refresh</button>
+  </form>
+  <form method="post" action="{{ url_for('logout') }}" style="display:inline">
+    <button class="btn sm ghost" type="submit">Sign out</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block style %}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 6px}
+.stat{background:var(--soft);border:1px solid var(--line);border-radius:10px;
+  padding:12px 16px;min-width:104px}
+.stat b{display:block;font-size:25px;line-height:1.2;letter-spacing:-.02em}
+.stat span{font-size:12px;color:var(--muted)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.row-action{background:var(--warn-bg)}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+@media (max-width:640px){.settings{grid-template-columns:1fr}}
+{% endblock %}
+
+{% block content %}
+
+{% if welcome %}
+<div class="flash ok">
+  Welcome. We are reading your inbox now &mdash; your sheet appears here in a
+  moment.{% if email_on %} The link is on its way to {{ user.email }}.{% endif %}
+</div>
+{% endif %}
+
+{% if user.last_error %}
+<div class="flash warn">Last sync had a problem: {{ user.last_error }}</div>
+{% endif %}
+
+<h1 style="margin-top:26px">Hi {{ user.first_name }}</h1>
+
+{% if syncing %}
+  <div class="card">
+    <strong>Reading your inbox&hellip;</strong>
+    <p class="small muted" style="margin:8px 0 0">
+      A year of mail takes a minute or two the first time. This page refreshes
+      itself.
+    </p>
+  </div>
+  <meta http-equiv="refresh" content="12">
+{% elif not apps %}
+  <div class="card">
+    <strong>No job applications found yet.</strong>
+    <p class="small muted" style="margin:8px 0 14px">
+      Either nothing in the last {{ user.lookback_days }} days looked like an
+      application, or the companies have not replied yet &mdash; an application
+      only becomes visible once someone emails you about it.
+    </p>
+    <form method="post" action="{{ url_for('refresh') }}">
+      <input type="hidden" name="full" value="1">
+      <button class="btn sm" type="submit">Search again</button>
+    </form>
+  </div>
+{% else %}
+
+<div class="stats">
+  <div class="stat"><b>{{ summary.total }}</b><span>tracked</span></div>
+  <div class="stat"><b>{{ summary.active }}</b><span>in progress</span></div>
+  <div class="stat"><b>{{ summary.needs_action|length }}</b><span>need you</span></div>
+  <div class="stat"><b>{{ "%.0f"|format(summary.response_rate * 100) }}%</b><span>response rate</span></div>
+</div>
+
+<p class="live">
+  {% if realtime %}<span class="dot"></span> Updating in real time{% else %}Checked every few minutes{% endif %}
+  {%- if user.last_sync_at %} &middot; last checked {{ user.last_sync_at[:16]|replace("T", " ") }} UTC{% endif %}
+</p>
+
+{% if summary.needs_action %}
+<h2>Needs you</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Company</th><th>Role</th><th>Stage</th><th>Since</th></tr></thead>
+  <tbody>
+  {% for a in summary.needs_action %}
+    <tr class="row-action">
+      <td><strong>{{ a.company }}</strong></td>
+      <td>{{ a.role }}</td>
+      <td><span class="pill {{ a.status.value|replace(' ','') }}">{{ a.status.value }}</span></td>
+      <td class="muted">{{ a.days_since_update }}d</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+
+{% if changes %}
+<h2>Changed today</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Company</th><th>Role</th><th>Was</th><th>Now</th></tr></thead>
+  <tbody>
+  {% for c in changes %}
+    <tr>
+      <td><strong>{{ c["company"] }}</strong></td>
+      <td>{{ c["role"] }}</td>
+      <td class="muted">{{ c["old_status"] }}</td>
+      <td><span class="pill {{ c["new_status"]|replace(' ','') }}">{{ c["new_status"] }}</span></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+
+<h2>All applications</h2>
+<div class="scroll"><table>
+  <thead>
+    <tr>
+      <th>Company</th><th>Role</th><th>Status</th>
+      <th class="hide-sm">Applied</th><th>Quiet</th>
+      <th class="hide-sm">Source</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for a in apps %}
+    <tr>
+      <td><strong>{{ a.company }}</strong></td>
+      <td>{{ a.role }}</td>
+      <td><span class="pill {{ a.status.value|replace(' ','') }}">{{ a.status.value }}</span></td>
+      <td class="muted hide-sm">{{ a.applied_on.strftime("%d %b %Y") if a.applied_on else "-" }}</td>
+      <td class="muted">{{ a.days_since_update }}d</td>
+      <td class="muted hide-sm">{{ a.source }}</td>
+      <td><a class="small" href="{{ a.thread_url }}" target="_blank" rel="noopener">email</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+
+<h2>Settings</h2>
+<div class="settings">
+  <div class="card">
+    <form method="post" action="{{ url_for('settings') }}">
+      <label>
+        <input type="checkbox" name="sync_enabled" {{ "checked" if user.sync_enabled }}>
+        Keep my tracker updated automatically
+      </label>
+      <label>
+        <input type="checkbox" name="notify_email" {{ "checked" if user.notify_email }}>
+        Email me when an application changes
+      </label>
+      <label>
+        Look back
+        <input type="number" name="lookback_days" value="{{ user.lookback_days }}"
+               min="30" max="1095" step="30" style="width:92px"> days
+      </label>
+      <button class="btn sm" type="submit" style="margin-top:10px">Save</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <strong>Your data</strong>
+    <p class="small muted" style="margin:8px 0 14px">
+      Disconnecting revokes our access to your Gmail and deletes everything
+      stored here. Your spreadsheet stays in your Drive &mdash; you own it.
+    </p>
+    <form method="post" action="{{ url_for('disconnect') }}"
+          onsubmit="return confirm('Disconnect Gmail and delete everything stored about you here?')">
+      <button class="btn sm danger" type="submit">Disconnect and delete my data</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

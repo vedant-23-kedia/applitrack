@@ -1,0 +1,40 @@
+# --- secrets: never commit these -----------------------------------------
+.env
+.env.*
+!.env.example
+credentials.json
+credentials-*.json
+client_secret*.json
+token.json
+*.pem
+*.key
+
+# --- personal data --------------------------------------------------------
+# Everything written into data/ is derived from somebody's mailbox: their
+# applications, their tokens, their digests. None of it belongs in a repo.
+data/*
+!data/.gitkeep
+
+# --- python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- local noise ----------------------------------------------------------
+*.db
+*.db-journal
+*.sqlite3
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

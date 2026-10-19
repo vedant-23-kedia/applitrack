@@ -1,0 +1,42 @@
+# AppliTrack configuration
+# Secrets belong in environment variables, not here. See README.md.
+
+# How much mail to read
+lookback_days: 365        # how far back to search Gmail
+max_emails: 1500          # safety cap per sync
+extra_query: ""           # extra Gmail search terms, e.g. "-from:oldcompany.com"
+
+# When to give up on silence
+ghost_after_days: 45      # no reply for this long -> marked Ghosted
+
+# Where things are written
+db_path: data/applitrack.db
+xlsx_path: data/applications.xlsx
+csv_path: data/applications.csv
+
+# Google Sheet. Leave blank and `applitrack sync --sheet` creates one,
+# then writes the id back here.
+spreadsheet_id: ""
+spreadsheet_title: Job Application Tracker
+
+# Optional: let Claude re-check emails the rules found ambiguous.
+# Needs `pip install anthropic` and ANTHROPIC_API_KEY.
+use_llm: false
+llm_model: claude-sonnet-5-5
+
+# How you want to be told
+notify:
+  desktop: true           # Windows toast on a status change
+  email_to: ""            # set, with smtp below, to get the digest by email
+
+# For Gmail use an App Password, not your account password.
+# Better: set APPLITRACK_SMTP_USER / APPLITRACK_SMTP_PASSWORD instead.
+smtp:
+  host: smtp.gmail.com
+  port: 587
+  user: ""
+  password: ""
+
+# Manual overrides when something slips through
+ignore_senders: []        # e.g. ["noreply@spammyboard.com"]
+ignore_companies: []      # e.g. ["Some Recruiter Ltd"]

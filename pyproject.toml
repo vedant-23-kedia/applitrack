@@ -1,0 +1,19 @@
+[project]
+name = "applitrack"
+version = "1.0.0"
+description = "Track job applications straight from your Gmail inbox"
+requires-python = ">=3.10"
+
+[project.scripts]
+applitrack = "applitrack.cli:main"
+applitrack-service = "applitrack.web.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["applitrack", "applitrack.web"]
+
+[tool.setuptools.package-data]
+"applitrack.web" = ["templates/*.html"]
