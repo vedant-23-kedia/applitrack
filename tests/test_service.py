@@ -591,6 +591,77 @@ def test_sheet_formatting_puts_text_colour_inside_textformat():
             if k == "foregroundColorStyle" and p.endswith("textFormat")]
     assert good, "header text colour was dropped entirely"
 
+
+# --------------------------------------------------------------------------
+# Chunked first sync (for hosts with a hard request timeout)
+# --------------------------------------------------------------------------
+
+def test_backlog_drives_the_dashboard_continue_loop():
+    """A capped sync must tell the page there is more to come."""
+    import applitrack.web.app as webapp
+
+    app = _app()
+    users = app.user_store
+    users.upsert("chunky", "chunky@example.com", "Chunk Tester",
+                 json.dumps({"refresh_token": "x"}))
+    users.update("chunky", last_sync_at="2026-10-20T00:00:00")
+
+    store = Store(webapp.DB_PATH, user_id="chunky")
+    signal = classify(ALICE_MAIL)
+    store.record_signal(signal)
+    store.replace_applications(build_applications([signal]))
+    store.set_meta("backlog", "431")
+    store.commit()
+    store.close()
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = "chunky"
+
+    body = client.get("/dashboard").get_data(as_text=True)
+    assert "431" in body, "backlog count not shown"
+    assert "/continue" in body, "page has no way to fetch the next chunk"
+    assert "emails left to read" in body
+
+
+def test_no_backlog_means_no_continue_loop():
+    import applitrack.web.app as webapp
+
+    app = _app()
+    users = app.user_store
+    users.upsert("clean", "clean@example.com", "Clean",
+                 json.dumps({"refresh_token": "x"}))
+    users.update("clean", last_sync_at="2026-10-20T00:00:00")
+
+    store = Store(webapp.DB_PATH, user_id="clean")
+    signal = classify(ALICE_MAIL)
+    store.record_signal(signal)
+    store.replace_applications(build_applications([signal]))
+    store.set_meta("backlog", "0")
+    store.commit()
+    store.close()
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = "clean"
+
+    body = client.get("/dashboard").get_data(as_text=True)
+    assert "emails left to read" not in body
+    assert "ACME" in body, "finished tracker should render normally"
+
+
+def test_sync_result_knows_when_it_is_incomplete():
+    from applitrack.web.service import SyncResult
+
+    partial = SyncResult(ok=True, fetched=250, remaining=550)
+    assert partial.complete is False
+
+    finished = SyncResult(ok=True, fetched=250, remaining=0)
+    assert finished.complete is True
+
+    failed = SyncResult(ok=False, error="boom", remaining=0)
+    assert failed.complete is False
+
 # --------------------------------------------------------------------------
 
 def run() -> int:

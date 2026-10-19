@@ -10,6 +10,7 @@ There are two ways to run it:
 |---|---|
 | **Just for you** | The CLI, below. Your mailbox, your machine. |
 | **For anyone** | A web service where people connect their own Gmail and get their own sheet. See **[SERVICE.md](SERVICE.md)**. |
+| **Hosted, free** | Running it on PythonAnywhere's free tier: **[deploy/PYTHONANYWHERE.md](deploy/PYTHONANYWHERE.md)**. |
 
 ```
 56 applications   6 in progress   25% got a real response

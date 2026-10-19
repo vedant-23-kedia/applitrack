@@ -185,6 +185,7 @@ def _register_routes(app: Flask, user_store: UserStore):
             summary = summarise(apps)
             recent = store.recent_changes(
                 datetime.now(timezone.utc).replace(hour=0, minute=0) )
+            backlog = int(store.get_meta("backlog", "0") or 0)
         finally:
             store.close()
 
@@ -200,6 +201,7 @@ def _register_routes(app: Flask, user_store: UserStore):
             welcome=request.args.get("welcome"),
             realtime=push.push_configured() and bool(user.watch_expires_at),
             email_on=mailer_configured(),
+            backlog=backlog,
         )
 
     @app.route("/refresh", methods=["POST"])
@@ -220,6 +222,25 @@ def _register_routes(app: Flask, user_store: UserStore):
         else:
             flash(f"Sync failed: {result.error}", "warn")
         return redirect(url_for("dashboard"))
+
+    @app.route("/continue", methods=["POST"])
+    @login_required
+    def continue_sync(user):
+        """Fetch the next chunk of a first read.
+
+        Hosts with a hard request timeout cannot do a year of mail in one
+        go, so the page calls this repeatedly until the backlog is clear.
+        """
+        result = sync_user(user, user_store, DB_PATH, notify=False)
+        return {
+            "ok": result.ok,
+            "skipped": result.skipped,
+            "fetched": result.fetched,
+            "remaining": result.remaining,
+            "applications": result.applications,
+            "complete": result.complete,
+            "error": result.error,
+        }
 
     @app.route("/settings", methods=["POST"])
     @login_required

@@ -45,7 +45,65 @@
 
 <h1 style="margin-top:26px">Hi {{ user.first_name }}</h1>
 
-{% if syncing %}
+{% if backlog %}
+  <div class="card" id="backlog-card">
+    <strong>Reading your inbox&hellip;</strong>
+    <p class="small muted" style="margin:8px 0 10px" id="backlog-text">
+      About <b>{{ backlog }}</b> emails left to read. Your host limits how long
+      one request can run, so this works through them in batches. Leave this
+      page open &mdash; it continues on its own.
+    </p>
+    <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden">
+      <div id="backlog-bar" style="height:100%;width:0;background:var(--accent);
+           transition:width .4s ease"></div>
+    </div>
+    <p class="small muted" style="margin:10px 0 0" id="backlog-status">Working&hellip;</p>
+  </div>
+
+  <script>
+  (function () {
+    // Each call fetches one batch. Repeat until the backlog is clear, then
+    // reload so the finished tracker renders.
+    var start = {{ backlog }};
+    var text = document.getElementById('backlog-text');
+    var bar = document.getElementById('backlog-bar');
+    var status = document.getElementById('backlog-status');
+
+    function step() {
+      fetch('{{ url_for("continue_sync") }}', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fetch' }
+      })
+        .then(function (r) { return r.json(); })
+        .catch(function () { return { ok: false, error: 'network' }; })
+        .then(function (d) {
+          if (!d.ok) {
+            status.textContent = 'Paused: ' + (d.error || 'something went wrong')
+              + ' - retrying in 30s';
+            setTimeout(step, 30000);
+            return;
+          }
+          if (d.skipped) { setTimeout(step, 5000); return; }
+
+          var left = d.remaining || 0;
+          var done = Math.max(0, start - left);
+          bar.style.width = start ? Math.round((done / start) * 100) + '%' : '100%';
+          text.innerHTML = 'About <b>' + left + '</b> emails left to read.';
+          status.textContent = d.applications + ' applications found so far';
+
+          if (d.complete) {
+            status.textContent = 'Done - loading your tracker...';
+            setTimeout(function () { location.reload(); }, 900);
+          } else {
+            setTimeout(step, 1200);
+          }
+        });
+    }
+    step();
+  })();
+  </script>
+
+{% elif syncing %}
   <div class="card">
     <strong>Reading your inbox&hellip;</strong>
     <p class="small muted" style="margin:8px 0 0">

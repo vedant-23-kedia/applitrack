@@ -43,6 +43,13 @@ _locks_guard = threading.Lock()
 LOCK_DIR = Path(os.environ.get("APPLITRACK_LOCK_DIR", "data/locks"))
 LOCK_STALE_SECONDS = 1800          # a sync that outlives this is assumed dead
 
+# How many messages one sync may download. Reading a year of mail can take
+# ten minutes, and some hosts cut a request off long before that. Because a
+# full sync is resumable, capping it turns one long job into several short
+# ones that each make progress -- so a platform with a hard request timeout
+# can still work through the whole backlog.
+MAX_FETCH_PER_SYNC = int(os.environ.get("APPLITRACK_MAX_FETCH_PER_SYNC", "1500"))
+
 
 def _lock_for(user_id: str) -> threading.Lock:
     with _locks_guard:
@@ -117,6 +124,11 @@ class SyncResult:
     sheet_url: str = ""
     error: str = ""
     skipped: bool = False
+    remaining: int = 0          # messages still to download; >0 means come back
+
+    @property
+    def complete(self) -> bool:
+        return self.ok and self.remaining == 0
 
     @property
     def summary_line(self) -> str:
@@ -197,14 +209,26 @@ def _sync_locked(user, user_store, db_path, force_full, notify) -> SyncResult:
             )
             todo = [i for i in ids if i not in already]
             result.mode = "full" if not already else "resume"
+
+            # Take at most one chunk, so a host that cuts requests short still
+            # makes progress every time instead of being killed mid-read.
+            chunk = todo[:MAX_FETCH_PER_SYNC]
+            result.remaining = len(todo) - len(chunk)
+
             log.info(
-                "%s: %d message(s) match, %d already fetched, %d to download",
-                user.email, len(ids), len(ids) - len(todo), len(todo),
+                "%s: %d match, %d already fetched, %d this pass, %d left after",
+                user.email, len(ids), len(ids) - len(todo), len(chunk), result.remaining,
             )
-            emails = client.fetch(todo) if todo else []
+            emails = client.fetch(chunk) if chunk else []
             store.mark_fetched([e.msg_id for e in emails])
             result.fetched = len(emails)
-            history_cursor = push.current_history_id(gmail)
+
+            # Only advance the Gmail cursor once the backlog is clear --
+            # otherwise the unread remainder would be skipped for good.
+            history_cursor = (
+                push.current_history_id(gmail) if not result.remaining
+                else user.last_history_id or None
+            )
 
         # Judge the new mail, then put it back together with everything
         # already judged -- grouping needs the whole history, not a slice.
@@ -227,6 +251,8 @@ def _sync_locked(user, user_store, db_path, force_full, notify) -> SyncResult:
         apps = build_applications(all_signals)
         result.applications = len(apps)
         result.changes = store.replace_applications(apps)
+        # The dashboard reads this to decide whether to keep going.
+        store.set_meta("backlog", str(result.remaining))
         store.commit()
 
         # Keep the sheet and the push subscription current.
