@@ -22,7 +22,7 @@ will live at `https://YOURUSERNAME.pythonanywhere.com`.
 minutes, so it cannot happen inside one web request. The sync is resumable, so
 the dashboard fetches ~200 messages per request and continues automatically
 until the backlog is clear. Your own first read is quicker done from a console
-(step 6), which has no time limit.
+(step 8), which has no time limit.
 
 Ongoing updates are incremental — a handful of messages, a second or two — so
 they fit comfortably in a request or the daily task.
@@ -58,17 +58,28 @@ Takes a few minutes. The virtualenv path you will need later is:
 /home/YOURUSERNAME/.virtualenvs/applitrack
 ```
 
-## 4. Create the `.env`
+## 4. Upload your OAuth client
 
-This holds both secrets. It is gitignored, so it never reaches GitHub.
+**Files** tab → navigate into `applitrack` → **Upload a file** → choose the
+`credentials.json` from your laptop.
+
+Uploading beats pasting the JSON into a terminal: the secret never goes
+through your clipboard or shell history, and `credentials.json` is gitignored
+so `git pull` will not touch it.
+
+> If you would rather not upload a file, the whole JSON can go in `.env` as
+> `APPLITRACK_CLIENT_SECRETS_JSON={"web":{...}}` on one line instead.
+
+## 5. Create the `.env`
 
 ```bash
 cd ~/applitrack
+mkdir -p data
 python -m applitrack.web.cli keygen          # copy the key it prints
 nano .env
 ```
 
-Paste, filling in the two blanks:
+Paste this, putting the generated key on the first line:
 
 ```
 APPLITRACK_SECRET_KEY=<the key you just generated>
@@ -76,23 +87,18 @@ APPLITRACK_REDIRECT_URI=https://YOURUSERNAME.pythonanywhere.com/oauth2callback
 APPLITRACK_HTTPS=1
 APPLITRACK_MAX_FETCH_PER_SYNC=200
 APPLITRACK_POLL_MINUTES=60
-APPLITRACK_CLIENT_SECRETS_JSON={"web":{...}}
 ```
 
-`Ctrl+O`, `Enter`, `Ctrl+X` to save.
-
-For the last line, open your `credentials.json` from your laptop, copy the
-**entire contents onto one line**, and paste it after `=`. Supplying it as a
-variable rather than a file keeps the client secret out of the repo.
-
-Then lock the file down:
+`Ctrl+O`, `Enter`, `Ctrl+X` to save. Then lock both files down:
 
 ```bash
-chmod 600 .env
-mkdir -p data
+chmod 600 .env credentials.json
 ```
 
-## 5. Create the web app
+Keep a copy of that key somewhere safe. Losing it means every user has to
+reconnect their Gmail.
+
+## 6. Create the web app
 
 **Web** tab → **Add a new web app**
 
@@ -111,7 +117,7 @@ Then on the Web tab:
 
 Click the green **Reload** button.
 
-## 6. Tell Google about the new address
+## 7. Tell Google about the new address
 
 <https://console.cloud.google.com/auth/clients> → open your client →
 **Authorised redirect URIs** → **+ Add URI**:
@@ -129,7 +135,7 @@ https://YOURUSERNAME.pythonanywhere.com
 **Save.** Keep the `localhost:5000` entries too — both can coexist, so your
 laptop setup keeps working.
 
-## 7. Your own first read
+## 8. Your own first read
 
 Do this from a **Bash console**, which has no request timeout:
 
@@ -143,7 +149,7 @@ Run it a few times until it reports no remaining messages — each pass picks up
 where the last stopped. Only needed once; your friends' first reads are handled
 automatically by the dashboard.
 
-## 8. The daily task
+## 9. The daily task
 
 **Tasks** tab → add a daily scheduled task (pick a quiet hour):
 
@@ -153,7 +159,7 @@ cd /home/YOURUSERNAME/applitrack && /home/YOURUSERNAME/.virtualenvs/applitrack/b
 
 This keeps everyone's tracker current even if the web worker has been recycled.
 
-## 9. Let your friends in
+## 10. Let your friends in
 
 **This is required — without it they get `access_denied`.**
 
@@ -187,8 +193,8 @@ Then **Reload** on the Web tab.
 
 - **Error log**: Web tab → *Error log* — tracebacks land here
 - **Configuration check**: `workon applitrack && python -m applitrack.web.cli check`
-- **`redirect_uri_mismatch`**: step 6 was missed, or `APPLITRACK_REDIRECT_URI`
+- **`redirect_uri_mismatch`**: step 7 was missed, or `APPLITRACK_REDIRECT_URI`
   in `.env` does not match the Console exactly (`https`, no trailing slash)
-- **`access_denied`**: that person is not a Test user — step 9
+- **`access_denied`**: that person is not a Test user — step 10
 - **Sync seems stuck**: `python -m applitrack.web.cli users` shows each
   account's last sync and last error
