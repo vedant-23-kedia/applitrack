@@ -31,18 +31,48 @@ SCOPES = [
 
 CLIENT_SECRETS = os.environ.get("APPLITRACK_CLIENT_SECRETS", "credentials.json")
 
+# On a hosted platform there is no file to mount, and baking the client secret
+# into a container image is how it ends up somewhere it should not be. So the
+# whole JSON can be supplied as one environment variable instead, which is
+# what `fly secrets set` / a Heroku config var / a Kubernetes secret gives you.
+CLIENT_SECRETS_ENV = "APPLITRACK_CLIENT_SECRETS_JSON"
+
+
+def client_config() -> dict | None:
+    """The OAuth client, from the environment if set, otherwise from disk."""
+    raw = os.environ.get(CLIENT_SECRETS_ENV, "").strip()
+    if raw:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"{CLIENT_SECRETS_ENV} is set but is not valid JSON: {exc}"
+            ) from exc
+    if os.path.exists(CLIENT_SECRETS):
+        with open(CLIENT_SECRETS, encoding="utf-8") as fh:
+            return json.load(fh)
+    return None
+
+
+def client_source() -> str:
+    """Where the client config is coming from -- for the `check` command."""
+    if os.environ.get(CLIENT_SECRETS_ENV, "").strip():
+        return f"${CLIENT_SECRETS_ENV}"
+    return CLIENT_SECRETS
+
 
 def _flow(redirect_uri: str, state: str | None = None, code_verifier: str | None = None):
     from google_auth_oauthlib.flow import Flow
 
-    if not os.path.exists(CLIENT_SECRETS):
+    config = client_config()
+    if config is None:
         raise FileNotFoundError(
-            f"{CLIENT_SECRETS} not found. Create an OAuth client of type "
-            '"Web application" in Google Cloud Console, add your callback URL to '
-            "its authorised redirect URIs, and save the downloaded JSON here."
+            f"No OAuth client found. Either save the downloaded JSON as "
+            f"{CLIENT_SECRETS}, or set {CLIENT_SECRETS_ENV} to its contents.\n"
+            'It must be a "Web application" client - see SERVICE.md.'
         )
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS, scopes=SCOPES, state=state, code_verifier=code_verifier
+    flow = Flow.from_client_config(
+        config, scopes=SCOPES, state=state, code_verifier=code_verifier
     )
     flow.redirect_uri = redirect_uri
     return flow

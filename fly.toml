@@ -1,0 +1,50 @@
+# Fly.io configuration for AppliTrack.
+#
+# The machine deliberately stays running. Suspending it would stop the
+# background poller, which is the only thing keeping trackers up to date when
+# Gmail push notifications are not configured.
+
+app = "applitrack-vedant"
+primary_region = "bom"          # Mumbai
+
+[build]
+
+[env]
+  APPLITRACK_DB = "/data/applitrack.db"
+  APPLITRACK_USERS_DB = "/data/users.db"
+  APPLITRACK_LOCK_DIR = "/data/locks"
+  APPLITRACK_HTTPS = "1"
+  APPLITRACK_SCHEDULER = "1"
+  APPLITRACK_POLL_MINUTES = "15"
+  APPLITRACK_REDIRECT_URI = "https://applitrack-vedant.fly.dev/oauth2callback"
+
+# Both databases and the sync locks live here, so they survive deploys.
+[[mounts]]
+  source = "applitrack_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false     # keep the poller alive
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 40
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"               # lxml + Flask need more than 256mb
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8080
+    path = "/healthz"
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "20s"

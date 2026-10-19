@@ -68,7 +68,7 @@ def cmd_keygen() -> int:
 def cmd_check() -> int:
     from . import push
     from .mailer import configured as mail_configured, config as mail_config
-    from .oauth import CLIENT_SECRETS
+    from .oauth import CLIENT_SECRETS, client_config, client_source
 
     rows = []
 
@@ -76,21 +76,27 @@ def cmd_check() -> int:
     rows.append(("Encryption key", bool(key),
                  "set" if key else "missing - run: keygen"))
 
-    secrets_ok = os.path.exists(CLIENT_SECRETS)
-    rows.append(("Google OAuth client", secrets_ok,
-                 CLIENT_SECRETS if secrets_ok else f"{CLIENT_SECRETS} not found"))
+    try:
+        data = client_config()
+    except ValueError as exc:
+        data = None
+        rows.append(("Google OAuth client", False, str(exc)))
+    else:
+        rows.append(("Google OAuth client", data is not None,
+                     client_source() if data else f"{CLIENT_SECRETS} not found"))
 
-    if secrets_ok:
-        import json
-
-        try:
-            data = json.loads(open(CLIENT_SECRETS, encoding="utf-8").read())
-            kind = "web" if "web" in data else ("installed" if "installed" in data else "?")
-            rows.append(("  client type", kind == "web",
-                         f"{kind}" + ("" if kind == "web"
-                                      else " - the service needs a 'Web application' client")))
-        except Exception as exc:
-            rows.append(("  client type", False, str(exc)))
+    if data:
+        kind = "web" if "web" in data else ("installed" if "installed" in data else "?")
+        rows.append(("  client type", kind == "web",
+                     f"{kind}" + ("" if kind == "web"
+                                  else " - the service needs a 'Web application' client")))
+        uris = (data.get(kind) or {}).get("redirect_uris", [])
+        want = os.environ.get("APPLITRACK_REDIRECT_URI", "").strip()
+        if want:
+            rows.append(("  redirect registered", want in uris,
+                         "yes" if want in uris
+                         else f"{want} not in the client's redirect_uris "
+                              "(Google's own setting is what counts - this is only the local copy)"))
 
     redirect = os.environ.get("APPLITRACK_REDIRECT_URI", "")
     rows.append(("Redirect URI", True,
