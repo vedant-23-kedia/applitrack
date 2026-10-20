@@ -133,12 +133,20 @@ class GmailClient:
                 break
         return ids[:max_results]
 
-    def fetch(self, msg_ids: list[str], progress=None) -> list[Email]:
+    # Enough to judge an email without downloading it.
+    METADATA_HEADERS = ["From", "Subject", "Date", "To"]
+
+    def fetch(self, msg_ids: list[str], progress=None, fmt: str = "full") -> list[Email]:
         """Download messages in batches and normalise them.
 
-        Messages rate-limited inside a batch are collected and retried one by
-        one afterwards, so a partial throttle costs a few messages' delay
-        rather than the whole sync.
+        `fmt` is "full" for the whole message, or "metadata" for just the
+        headers plus Gmail's own snippet. A metadata fetch costs the same
+        quota but transfers a fraction of the bytes -- marketing mail runs to
+        hundreds of kilobytes each, and nearly all of it gets discarded, so
+        reading it in full is almost entirely wasted bandwidth.
+
+        Messages rate-limited inside a batch are collected and retried, so a
+        partial throttle costs a short delay rather than the whole sync.
         """
         emails: list[Email] = []
         pending = list(msg_ids)
@@ -184,10 +192,11 @@ class GmailClient:
 
                 batch = self.service.new_batch_http_request(callback=collect)
                 for mid in chunk:
+                    kwargs = {"userId": self.user_id, "id": mid, "format": fmt}
+                    if fmt == "metadata":
+                        kwargs["metadataHeaders"] = self.METADATA_HEADERS
                     batch.add(
-                        self.service.users()
-                        .messages()
-                        .get(userId=self.user_id, id=mid, format="full"),
+                        self.service.users().messages().get(**kwargs),
                         request_id=mid,
                     )
 
@@ -262,7 +271,13 @@ class GmailClient:
             return None
 
         date = _parse_date(headers.get("date"), msg.get("internalDate"))
-        body = _extract_body(payload)
+
+        # A metadata fetch carries no body; Gmail's snippet is what we judge
+        # it on instead. It is short, but it is the opening of the email,
+        # which is where the decisive wording almost always sits.
+        body = _extract_body(payload) or normalise_whitespace(
+            _unescape(msg.get("snippet", ""))
+        )
 
         return Email(
             msg_id=msg["id"],

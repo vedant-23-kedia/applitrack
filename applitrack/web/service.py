@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import net
-from ..classify import classify
+from ..classify import classify, worth_reading_in_full
 from ..gmail_client import GmailClient
 from ..models import Application, Signal
 from ..pipeline import build_applications, summarise
@@ -192,8 +192,13 @@ def _sync_locked(user, user_store, db_path, force_full, notify) -> SyncResult:
             else:
                 result.mode = "incremental"
                 new_ids = [i for i in ids if i not in store.seen_message_ids()]
-                emails = client.fetch(new_ids) if new_ids else []
-                store.mark_fetched([e.msg_id for e in emails])
+                emails = []
+                if new_ids:
+                    headers_only = client.fetch(new_ids, fmt="metadata")
+                    worth_it = [e for e in headers_only if worth_reading_in_full(e)]
+                    if worth_it:
+                        emails = client.fetch([e.msg_id for e in worth_it], fmt="full")
+                    store.mark_fetched([e.msg_id for e in headers_only])
                 result.fetched = len(emails)
                 history_cursor = latest
 
@@ -218,8 +223,26 @@ def _sync_locked(user, user_store, db_path, force_full, notify) -> SyncResult:
                 "%s: %d match, %d already fetched, %d this pass, %d left after",
                 user.email, len(ids), len(ids) - len(todo), len(chunk), result.remaining,
             )
-            emails = client.fetch(chunk) if chunk else []
-            store.mark_fetched([e.msg_id for e in emails])
+
+            # Two passes. The first reads headers and snippets only -- cheap,
+            # and enough to recognise the job-board marketing that makes up
+            # most of the inbox. Only what survives is downloaded in full.
+            emails = []
+            if chunk:
+                headers_only = client.fetch(chunk, fmt="metadata")
+                worth_it = [e for e in headers_only if worth_reading_in_full(e)]
+                log.info(
+                    "%s: %d scanned, %d worth reading in full (%d skipped)",
+                    user.email, len(headers_only), len(worth_it),
+                    len(headers_only) - len(worth_it),
+                )
+                if worth_it:
+                    emails = client.fetch([e.msg_id for e in worth_it], fmt="full")
+
+                # Everything scanned counts as fetched, including what was
+                # skipped -- otherwise the next sync would scan it all again.
+                store.mark_fetched([e.msg_id for e in headers_only])
+
             result.fetched = len(emails)
 
             # Only advance the Gmail cursor once the backlog is clear --

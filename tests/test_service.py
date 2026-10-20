@@ -817,6 +817,62 @@ def test_a_user_can_still_choose_a_longer_lookback():
                                    "sync_enabled": "on", "notify_email": "on"})
     assert users.get("lb").lookback_days == 365
 
+
+# --------------------------------------------------------------------------
+# Metadata prefilter
+# --------------------------------------------------------------------------
+
+def test_prefilter_keeps_real_application_mail_from_snippet_alone():
+    """The first pass only sees headers + a short snippet. Losing a genuine
+    application there is unrecoverable, so the bar must stay generous."""
+    from applitrack.classify import worth_reading_in_full
+
+    from datetime import timedelta
+    def meta(sender, subject, snippet, name=""):
+        return Email(msg_id=f"m{abs(hash(subject))%10**8}", thread_id="t",
+                     date=NOW - timedelta(days=5), sender=sender,
+                     sender_name=name or sender.split("@")[0],
+                     subject=subject, body=snippet, labels=["INBOX"])
+
+    keep = [
+        meta("donotreply@deloitte.com", "We are excited to receive your application!",
+             "Dear Vedant, Thank you for applying for the position of Campus28"),
+        meta("rbs@myworkday.com", "Your application R-00279183 update",
+             "Hi Vedant, Thank you for your interest in our Software Engineer job"),
+        meta("sai.burgute@cummins.com", "Cummins India - Internship Interview Results 2026",
+             "Dear Vedant, Greetings from Cummins India! Thank you for taking the time"),
+        meta("admin@hirepro.in", "KPMG India : Registration Notification",
+             "Dear Vedant Kedia, Thank you for showing interest in a career opportunity"),
+        meta("talent@ibm.com", "Your IBM Application Status",
+             "Ref: 83916 - Data Scientist. Dear Vedant Kedia, We regret to inform you"),
+    ]
+    lost = [e.subject for e in keep if not worth_reading_in_full(e)]
+    assert not lost, f"prefilter would discard real application mail: {lost}"
+
+
+def test_prefilter_discards_the_bulk_marketing():
+    from applitrack.classify import worth_reading_in_full
+    from datetime import timedelta
+
+    def meta(sender, subject, snippet):
+        return Email(msg_id=f"m{abs(hash(subject))%10**8}", thread_id="t",
+                     date=NOW - timedelta(days=1), sender=sender,
+                     sender_name=sender.split("@")[0], subject=subject,
+                     body=snippet, labels=["INBOX"])
+
+    junk = [
+        meta("student@mail.internshala.com", "Update: Your application for L Oreal India",
+             "Application window closes in 6 days! Apply now. Unsubscribe here."),
+        meta("noreply@unstop.news", "Hiring Alert: Grab a Eurogrip PPI & Win 3 Lakhs!",
+             "Apply Today! Prize pool of 3 Lakhs."),
+        meta("resumenc@naukri.com", "Vedant, you are missing job shortlists",
+             "Resume is outdated, update resume now."),
+        meta("student@internshala.com", "EvoNexis is hiring Machine Learning intern | Apply Now",
+             "Vedant, earn high stipend. Apply for free on Internshala."),
+    ]
+    leaked = [e.subject for e in junk if worth_reading_in_full(e)]
+    assert not leaked, f"prefilter let marketing through: {leaked}"
+
 # --------------------------------------------------------------------------
 
 def run() -> int:

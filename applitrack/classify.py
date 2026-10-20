@@ -142,6 +142,24 @@ def score_email(email: Email) -> Score:
     return Score(total, reasons)
 
 
+# A first pass runs over headers and snippets only. The bar is deliberately
+# far below MIN_SCORE: the job here is to discard the obvious junk -- bulk
+# senders, promotional blasts, non-job mail -- not to decide anything. A real
+# application email whose decisive sentence sits below the snippet must still
+# survive, because the second pass is what actually reads it.
+PREFILTER_SCORE = 0
+
+
+def worth_reading_in_full(email: Email) -> bool:
+    """Should this email's full body be downloaded?
+
+    Called with a metadata-only email. Nearly nine in ten messages matching
+    the Gmail search turn out to be job-board marketing, and those run to
+    hundreds of kilobytes each; skipping them is most of the sync time.
+    """
+    return score_email(email).value >= PREFILTER_SCORE
+
+
 def detect_status(email: Email) -> tuple[Status, float, str]:
     """Map an email onto a pipeline status.
 
