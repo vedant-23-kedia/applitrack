@@ -2,7 +2,7 @@
 # Secrets belong in environment variables, not here. See README.md.
 
 # How much mail to read
-lookback_days: 365        # how far back to search Gmail
+lookback_days: 90         # how far back to search Gmail (3 months)
 max_emails: 1500          # safety cap per sync
 extra_query: ""           # extra Gmail search terms, e.g. "-from:oldcompany.com"
 

@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..models import DEFAULT_LOOKBACK_DAYS
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     user_id          TEXT PRIMARY KEY,   -- Google 'sub' claim, stable forever
@@ -28,7 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     watch_expires_at TEXT,               -- Gmail push subscription expiry
     notify_email     INTEGER DEFAULT 1,
     sync_enabled     INTEGER DEFAULT 1,
-    lookback_days    INTEGER DEFAULT 365,
+    lookback_days    INTEGER DEFAULT 90,
     last_error       TEXT,
     state            TEXT DEFAULT 'active'
 );
@@ -49,7 +51,7 @@ class User:
     watch_expires_at: str = ""
     notify_email: bool = True
     sync_enabled: bool = True
-    lookback_days: int = 365
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS
     last_error: str = ""
     state: str = "active"
 
@@ -185,7 +187,7 @@ def _to_user(row: sqlite3.Row) -> User:
         watch_expires_at=row["watch_expires_at"] or "",
         notify_email=bool(row["notify_email"]),
         sync_enabled=bool(row["sync_enabled"]),
-        lookback_days=row["lookback_days"] or 365,
+        lookback_days=row["lookback_days"] or DEFAULT_LOOKBACK_DAYS,
         last_error=row["last_error"] or "",
         state=row["state"] or "active",
     )

@@ -10,10 +10,12 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .models import DEFAULT_LOOKBACK_DAYS
+
 DEFAULT_PATH = "config.yaml"
 
 DEFAULTS = {
-    "lookback_days": 365,
+    "lookback_days": DEFAULT_LOOKBACK_DAYS,
     "max_emails": 1500,
     "ghost_after_days": 45,
     "min_score": None,            # None = use rules.MIN_SCORE
@@ -34,7 +36,7 @@ DEFAULTS = {
 
 @dataclass
 class Config:
-    lookback_days: int = 365
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS
     max_emails: int = 1500
     ghost_after_days: int = 45
     min_score: int | None = None

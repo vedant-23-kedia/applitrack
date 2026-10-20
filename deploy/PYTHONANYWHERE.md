@@ -18,8 +18,8 @@ will live at `https://YOURUSERNAME.pythonanywhere.com`.
 | A web request running longer than ~5 minutes | ❌ — handled by chunking, below |
 | An always-on background worker | ❌ — one scheduled task per day instead |
 
-**What this means in practice:** a first read of a year's mail takes about ten
-minutes, so it cannot happen inside one web request. The sync is resumable, so
+**What this means in practice:** a first read takes a few minutes (longer if you
+raise the lookback to a year), so it cannot happen inside one web request. The sync is resumable, so
 the dashboard fetches ~200 messages per request and continues automatically
 until the backlog is clear. Your own first read is quicker done from a console
 (step 8), which has no time limit.

@@ -29,6 +29,7 @@ from flask import (
 )
 
 from ..env import configure_proxy, load_dotenv
+from ..models import DEFAULT_LOOKBACK_DAYS
 from ..pipeline import summarise
 from ..store import Store
 from . import oauth, push
@@ -251,7 +252,7 @@ def _register_routes(app: Flask, user_store: UserStore):
             user.user_id,
             notify_email=request.form.get("notify_email") == "on",
             sync_enabled=request.form.get("sync_enabled") == "on",
-            lookback_days=max(30, min(1095, int(request.form.get("lookback_days", 365)))),
+            lookback_days=max(30, min(1095, int(request.form.get("lookback_days", DEFAULT_LOOKBACK_DAYS)))),
         )
         flash("Settings saved.", "ok")
         return redirect(url_for("dashboard"))

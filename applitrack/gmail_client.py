@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from email.utils import parseaddr, parsedate_to_datetime
 
-from .models import Email
+from .models import DEFAULT_LOOKBACK_DAYS, Email
 
 log = logging.getLogger("applitrack.gmail")
 
@@ -229,7 +229,7 @@ class GmailClient:
         emails.sort(key=lambda e: e.date)
         return emails
 
-    def full_query(self, since_days: int = 365, extra_query: str = "") -> str:
+    def full_query(self, since_days: int = DEFAULT_LOOKBACK_DAYS, extra_query: str = "") -> str:
         """The Gmail search used for a full sync."""
         after = (datetime.now(timezone.utc) - timedelta(days=since_days)).strftime("%Y/%m/%d")
         query = f"{BASE_QUERY} after:{after}"
@@ -239,7 +239,7 @@ class GmailClient:
 
     def search_and_fetch(
         self,
-        since_days: int = 365,
+        since_days: int = DEFAULT_LOOKBACK_DAYS,
         extra_query: str = "",
         max_results: int = 1000,
         progress=None,

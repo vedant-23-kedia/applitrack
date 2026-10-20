@@ -9,6 +9,11 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
+# How far back a first sync reads. Three months covers the applications
+# that are still live for most people; a year took ten minutes to read
+# and mostly returned things already decided. Adjustable per user.
+DEFAULT_LOOKBACK_DAYS = 90
+
 
 class Status(str, Enum):
     """Where an application currently stands.

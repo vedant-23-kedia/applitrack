@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .config import Config
-from .models import Status
+from .models import DEFAULT_LOOKBACK_DAYS, Status
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_explain = sub.add_parser("explain", help="show the scoring for matching emails")
     p_explain.add_argument("query", help="text to match in the subject")
-    p_explain.add_argument("--days", type=int, default=365)
+    p_explain.add_argument("--days", type=int, default=DEFAULT_LOOKBACK_DAYS)
 
     p_watch = sub.add_parser("watch", help="sync on a loop")
     p_watch.add_argument("--every", type=int, default=60, help="minutes between syncs")

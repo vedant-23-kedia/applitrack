@@ -42,6 +42,9 @@ os.environ.setdefault("APPLITRACK_HTTPS", "1")
 # dashboard work through the backlog across several short requests instead.
 os.environ.setdefault("APPLITRACK_MAX_FETCH_PER_SYNC", "200")
 
+# Each user can change their own lookback on the dashboard; the
+# default is 90 days.
+
 # The background poller runs inside the web worker here. It is not guaranteed
 # to be alive -- free workers get recycled -- so the daily scheduled task is
 # the reliable path. An hour keeps CPU use well inside the free allowance.

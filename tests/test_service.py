@@ -792,6 +792,31 @@ def test_proxy_url_prefers_explicit_setting_over_environment():
     finally:
         _clear_proxy_env()
 
+
+def test_default_lookback_is_three_months():
+    """One source of truth, so config, new users and the CLI cannot drift."""
+    from applitrack.config import Config
+    from applitrack.models import DEFAULT_LOOKBACK_DAYS
+    from applitrack.web.users import User
+
+    assert DEFAULT_LOOKBACK_DAYS == 90
+    assert Config().lookback_days == 90
+    assert User(user_id="u", email="e@x.com").lookback_days == 90
+
+
+def test_a_user_can_still_choose_a_longer_lookback():
+    app = _app()
+    users = app.user_store
+    users.upsert("lb", "lb@example.com", "LB", json.dumps({"refresh_token": "x"}))
+    assert users.get("lb").lookback_days == 90
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = "lb"
+    client.post("/settings", data={"lookback_days": "365",
+                                   "sync_enabled": "on", "notify_email": "on"})
+    assert users.get("lb").lookback_days == 365
+
 # --------------------------------------------------------------------------
 
 def run() -> int:

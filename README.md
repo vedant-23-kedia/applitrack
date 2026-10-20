@@ -82,7 +82,7 @@ anything.
 python -m applitrack.cli sync --sheet
 ```
 
-This reads the last year of mail, builds the tracker, writes
+This reads the last 3 months of mail, builds the tracker, writes
 `data/applications.xlsx` and creates a Google Sheet. The spreadsheet id is
 saved back into `config.yaml`, so later syncs update the same sheet instead of
 making new ones.
