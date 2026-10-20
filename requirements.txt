@@ -17,9 +17,9 @@ Flask>=3.0.3
 cryptography>=43.0.0
 requests>=2.32.3
 
-# Production server (Linux/macOS). On Windows use waitress instead.
-# gunicorn>=22.0.0
-# waitress>=3.0.0
+# Production server. waitress runs on Windows (gunicorn does not);
+# the Dockerfile installs gunicorn separately for Linux hosts.
+waitress>=3.0.0
 
 # Optional: LLM fallback for ambiguous emails (applitrack sync --llm)
 # anthropic>=0.40.0
