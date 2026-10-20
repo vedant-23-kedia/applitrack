@@ -268,10 +268,9 @@ def _register_routes(app: Flask, user_store: UserStore):
         creds = oauth.load_credentials(user_store, user.user_id)
         if creds:
             try:
-                from googleapiclient.discovery import build
+                from .. import net as _net
 
-                push.stop_watch(build("gmail", "v1", credentials=creds,
-                                      cache_discovery=False))
+                push.stop_watch(_net.build_service("gmail", "v1", creds))
             except Exception:
                 pass
             oauth.revoke(creds)
@@ -347,8 +346,9 @@ def _probe_outbound() -> dict:
     expects a POST still proves the connection got through. Only a transport
     error means blocked.
     """
-    import requests
+    from .. import net
 
+    sess = net.session()
     targets = {
         "token": "https://oauth2.googleapis.com/token",
         "gmail": "https://gmail.googleapis.com/$discovery/rest?version=v1",
@@ -357,7 +357,7 @@ def _probe_outbound() -> dict:
     out = {}
     for name, url in targets.items():
         try:
-            out[name] = requests.get(url, timeout=12).status_code
+            out[name] = sess.get(url, timeout=12).status_code
         except Exception as exc:
             out[name] = f"FAIL: {type(exc).__name__}"
     out["reachable"] = all(isinstance(v, int) for v in out.values() if v != out.get("reachable"))

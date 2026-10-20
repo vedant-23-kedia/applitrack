@@ -724,6 +724,74 @@ def test_explicit_proxy_wins_and_host_proxy_is_never_overridden():
     finally:
         _clear_proxy_env()
 
+
+# --------------------------------------------------------------------------
+# Explicit proxy transports
+# --------------------------------------------------------------------------
+
+def test_requests_session_carries_the_proxy_explicitly():
+    """Regression: env vars alone were not honoured, and the OAuth token
+    exchange went out direct -> '[Errno 101] Network is unreachable'."""
+    from applitrack import net
+
+    _clear_proxy_env()
+    os.environ["APPLITRACK_PROXY"] = "http://proxy.server:3128"
+    try:
+        assert net.proxy_url() == "http://proxy.server:3128"
+        assert net.proxies() == {
+            "http": "http://proxy.server:3128",
+            "https": "http://proxy.server:3128",
+        }
+        s = net.session()
+        assert s.proxies["https"] == "http://proxy.server:3128"
+        # trust_env off, so a stray no_proxy cannot send us back out direct.
+        assert s.trust_env is False
+    finally:
+        _clear_proxy_env()
+
+
+def test_httplib2_proxy_info_is_built_correctly():
+    from applitrack import net
+
+    _clear_proxy_env()
+    os.environ["APPLITRACK_PROXY"] = "http://proxy.server:3128"
+    try:
+        info = net._proxy_info()
+        assert info is not None
+        assert info.proxy_host == b"proxy.server" or info.proxy_host == "proxy.server"
+        assert info.proxy_port == 3128
+        h = net.http()
+        assert h.proxy_info is not None
+    finally:
+        _clear_proxy_env()
+
+
+def test_no_proxy_means_ordinary_direct_transports():
+    from applitrack import net
+
+    _clear_proxy_env()
+    try:
+        assert net.proxy_url() is None
+        assert net.proxies() == {}
+        s = net.session()
+        assert not s.proxies
+        assert s.trust_env is True
+        assert net._proxy_info() is None
+    finally:
+        _clear_proxy_env()
+
+
+def test_proxy_url_prefers_explicit_setting_over_environment():
+    from applitrack import net
+
+    _clear_proxy_env()
+    os.environ["https_proxy"] = "http://from.env:3128"
+    os.environ["APPLITRACK_PROXY"] = "http://explicit:8080"
+    try:
+        assert net.proxy_url() == "http://explicit:8080"
+    finally:
+        _clear_proxy_env()
+
 # --------------------------------------------------------------------------
 
 def run() -> int:

@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 import os
 
+from .. import net
+
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -110,16 +112,31 @@ def exchange_code(
     `code_verifier` must be the one handed out by `authorization_url`.
     """
     flow = _flow(redirect_uri, state=state, code_verifier=code_verifier)
-    flow.fetch_token(authorization_response=authorization_response)
+
+    # Explicit proxies, not environment variables. On a host with no direct
+    # route out, relying on the environment left this call going direct and
+    # failing with "[Errno 101] Network is unreachable" -- after the user had
+    # already approved access, which makes it look like the app is broken.
+    kwargs = {"authorization_response": authorization_response}
+    if net.proxies():
+        kwargs["proxies"] = net.proxies()
+    flow.fetch_token(**kwargs)
     return flow.credentials
 
 
 def identity(credentials) -> dict:
-    """Who signed in: the stable Google id, their address and name."""
-    from googleapiclient.discovery import build
+    """Who signed in: the stable Google id, their address and name.
 
-    service = build("oauth2", "v2", credentials=credentials, cache_discovery=False)
-    info = service.userinfo().get().execute()
+    A plain HTTPS call rather than googleapiclient, so there is one fewer
+    transport to get the proxy right on.
+    """
+    resp = net.session().get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {credentials.token}"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    info = resp.json()
     return {
         "user_id": info["id"],
         "email": info.get("email", ""),
@@ -157,8 +174,6 @@ def load_credentials(user_store, user_id: str):
     Returns None when the person has revoked access -- the caller should stop
     syncing them rather than retrying forever.
     """
-    from google.auth.transport.requests import Request
-
     data = user_store.load_credentials(user_id)
     if not data:
         return None
@@ -169,7 +184,7 @@ def load_credentials(user_store, user_id: str):
 
     if creds.refresh_token:
         try:
-            creds.refresh(Request())
+            creds.refresh(net.auth_request())
             user_store.save_credentials(user_id, credentials_to_json(creds))
             return creds
         except Exception as exc:
@@ -180,10 +195,8 @@ def load_credentials(user_store, user_id: str):
 
 def revoke(credentials) -> bool:
     """Tell Google to forget the grant. Best effort."""
-    import requests
-
     try:
-        response = requests.post(
+        response = net.session().post(
             "https://oauth2.googleapis.com/revoke",
             params={"token": credentials.refresh_token or credentials.token},
             headers={"content-type": "application/x-www-form-urlencoded"},

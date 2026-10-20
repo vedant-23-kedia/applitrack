@@ -114,12 +114,19 @@ def cmd_check() -> int:
                      "set" if push.PUSH_TOKEN
                      else "missing - /push accepts anonymous posts"))
 
+    from .. import net
     from ..env import on_pythonanywhere
-    proxy = os.environ.get("https_proxy") or os.environ.get("HTTPS_PROXY")
+    proxy = net.proxy_url()
     if on_pythonanywhere() or proxy:
         rows.append(("Outbound proxy", bool(proxy),
-                     proxy or "PythonAnywhere detected but no proxy set - "
+                     proxy or "proxy host detected but no proxy set - "
                               "outbound calls will fail"))
+        if proxy:
+            ok = net._socks_available()
+            rows.append(("  httplib2 proxying", ok,
+                         "PySocks present" if ok
+                         else "PySocks MISSING - every Google API call will "
+                              "ignore the proxy. Run: pip install PySocks"))
 
     try:
         import flask  # noqa: F401

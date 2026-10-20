@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .. import net
 from ..classify import classify
 from ..gmail_client import GmailClient
 from ..models import Application, Signal
@@ -171,14 +172,12 @@ def sync_user(
 
 
 def _sync_locked(user, user_store, db_path, force_full, notify) -> SyncResult:
-    from googleapiclient.discovery import build
-
     creds = oauth.load_credentials(user_store, user.user_id)
     if creds is None:
         user_store.update(user.user_id, state="revoked", sync_enabled=False)
         return SyncResult(ok=False, error="access revoked - the user must reconnect")
 
-    gmail = build("gmail", "v1", credentials=creds, cache_discovery=False)
+    gmail = net.build_service("gmail", "v1", creds)
     client = GmailClient(service=gmail)
 
     store = Store(db_path, user_id=user.user_id)
@@ -272,11 +271,9 @@ def _sync_locked(user, user_store, db_path, force_full, notify) -> SyncResult:
 
 def write_user_sheet(creds, user, user_store, apps: list[Application]) -> str:
     """Create or update the person's spreadsheet, in their own Drive."""
-    from googleapiclient.discovery import build
-
     from ..sheets import SheetsWriter
 
-    service = build("sheets", "v4", credentials=creds, cache_discovery=False)
+    service = net.build_service("sheets", "v4", creds)
     writer = SheetsWriter(service=service, spreadsheet_id=user.spreadsheet_id or None)
 
     if not user.spreadsheet_id:
