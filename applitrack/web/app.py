@@ -316,9 +316,17 @@ def _register_routes(app: Flask, user_store: UserStore):
 
     @app.route("/healthz")
     def healthz():
+        # ?probe=1 additionally checks that this host can actually reach
+        # Google. Sign-in fails confusingly without it: the browser half
+        # succeeds, then the server cannot swap the code for a token.
+        probe = None
+        if request.args.get("probe"):
+            probe = _probe_outbound()
+
         return {
             "ok": True,
-            "proxy": bool(_PROXY),
+            "proxy": _PROXY or False,
+            "outbound": probe,
             "users": user_store.count(),
             "realtime": push.push_configured(),
             "email": mailer_configured(),
@@ -330,6 +338,30 @@ def _register_routes(app: Flask, user_store: UserStore):
 
 
 # --------------------------------------------------------------------------
+
+
+def _probe_outbound() -> dict:
+    """Can this host reach the Google endpoints the app depends on?
+
+    Any HTTP status means reachable -- 400 or 405 from an endpoint that
+    expects a POST still proves the connection got through. Only a transport
+    error means blocked.
+    """
+    import requests
+
+    targets = {
+        "token": "https://oauth2.googleapis.com/token",
+        "gmail": "https://gmail.googleapis.com/$discovery/rest?version=v1",
+        "sheets": "https://sheets.googleapis.com/$discovery/rest?version=v4",
+    }
+    out = {}
+    for name, url in targets.items():
+        try:
+            out[name] = requests.get(url, timeout=12).status_code
+        except Exception as exc:
+            out[name] = f"FAIL: {type(exc).__name__}"
+    out["reachable"] = all(isinstance(v, int) for v in out.values() if v != out.get("reachable"))
+    return out
 
 
 def _first_sync(user_id: str, user_store: UserStore, is_new: bool):
