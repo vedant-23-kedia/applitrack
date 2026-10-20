@@ -37,10 +37,11 @@ os.environ.setdefault("APPLITRACK_LOCK_DIR", f"{PROJECT}/data/locks")
 # Served over HTTPS by PythonAnywhere, so secure cookies are correct.
 os.environ.setdefault("APPLITRACK_HTTPS", "1")
 
-# A free account cuts a web request off after about five minutes, and a full
-# year of mail takes longer than that. Capping the chunk size lets the
-# dashboard work through the backlog across several short requests instead.
-os.environ.setdefault("APPLITRACK_MAX_FETCH_PER_SYNC", "200")
+# A free account cuts a web request off after about five minutes. At the
+# measured rate -- roughly 8 messages a second once the pacing stopped
+# tripping Gmail's rate limit -- 500 takes about a minute, so most people
+# finish in a single pass. Anything left over continues automatically.
+os.environ.setdefault("APPLITRACK_MAX_FETCH_PER_SYNC", "500")
 
 # Each user can change their own lookback on the dashboard; the
 # default is 90 days.

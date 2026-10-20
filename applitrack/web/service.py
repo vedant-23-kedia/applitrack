@@ -229,15 +229,20 @@ def _sync_locked(user, user_store, db_path, force_full, notify) -> SyncResult:
             # most of the inbox. Only what survives is downloaded in full.
             emails = []
             if chunk:
+                t_scan = time.monotonic()
                 headers_only = client.fetch(chunk, fmt="metadata")
+                scan_secs = time.monotonic() - t_scan
                 worth_it = [e for e in headers_only if worth_reading_in_full(e)]
                 log.info(
                     "%s: %d scanned, %d worth reading in full (%d skipped)",
                     user.email, len(headers_only), len(worth_it),
                     len(headers_only) - len(worth_it),
                 )
+                t_read = time.monotonic()
                 if worth_it:
                     emails = client.fetch([e.msg_id for e in worth_it], fmt="full")
+                log.info("%s: scanned in %.0fs, read in %.0fs",
+                         user.email, scan_secs, time.monotonic() - t_read)
 
                 # Everything scanned counts as fetched, including what was
                 # skipped -- otherwise the next sync would scan it all again.

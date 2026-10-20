@@ -29,11 +29,22 @@ log = logging.getLogger("applitrack.gmail")
 # sits exactly on the limit -- and anything else touching the mailbox at the
 # same time puts it over. 25 messages per ~2s is roughly 60 units/second,
 # a quarter of the budget, which leaves room for a second sync to coexist.
-BATCH_SIZE = 25
+# Measured against a real mailbox: batches of 25 fired about a second apart
+# were already being refused, so the practical ceiling on this project is far
+# below Gmail's documented 250 units/second. Ten messages per ~1.3s is about
+# 38 units/second -- slow enough to avoid the throttle entirely, which is
+# what actually matters, because being throttled once costs more time than
+# the pacing ever does.
+BATCH_SIZE = 10
 MIN_BATCH_SIZE = 5
 PAUSE_BETWEEN_BATCHES = 1.0     # seconds
-MAX_PAUSE = 16.0
-COOLDOWN_SECONDS = 65           # a full quota window, for when we do get throttled
+MAX_PAUSE = 8.0
+
+# The old 65s cooldown assumed a per-minute window that had to refill
+# completely. In practice the limit behaves like a short moving average, and
+# the pacing above has already backed off by the time a round ends -- so a
+# full minute of sitting still was pure waste. Escalate only if it persists.
+COOLDOWNS = (8, 20, 45)
 MAX_ROUNDS = 4                  # re-attempts of the whole throttled remainder
 MAX_ATTEMPTS = 6
 
@@ -75,7 +86,7 @@ def retry(call, what: str = "gmail call", attempts: int = MAX_ATTEMPTS):
         except Exception as exc:
             if attempt == attempts - 1 or not is_retryable(exc):
                 raise
-            delay = min(2.0 * (2 ** attempt), 64.0) + random.uniform(0, 1.0)
+            delay = min(1.0 * (2 ** attempt), 20.0) + random.uniform(0, 0.5)
             log.warning(
                 "%s rate-limited (attempt %d/%d), waiting %.1fs",
                 what, attempt + 1, attempts, delay,
@@ -157,13 +168,14 @@ class GmailClient:
             if not pending:
                 break
             if round_no:
-                # Everything left was throttled. Let the quota window refill
-                # before trying again -- hammering it just extends the ban.
+                # Everything left was throttled. Pause briefly -- the pacing
+                # has already slowed down, so a long wait buys nothing.
+                cooldown = COOLDOWNS[min(round_no - 1, len(COOLDOWNS) - 1)]
                 log.warning(
-                    "%d message(s) throttled; cooling down %ds before round %d",
-                    len(pending), COOLDOWN_SECONDS, round_no + 1,
+                    "%d message(s) throttled; pausing %ds before round %d",
+                    len(pending), cooldown, round_no + 1,
                 )
-                time.sleep(COOLDOWN_SECONDS)
+                time.sleep(cooldown)
 
             throttled: list[str] = []
             # Adaptive pacing: slow down when refused, speed back up when the
